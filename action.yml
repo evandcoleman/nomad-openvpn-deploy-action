@@ -1,0 +1,56 @@
+name: "Deploy to Nomad"
+description: "Deploys to Nomad over OpenVPN."
+inputs:
+  openvpn_config:
+    description: "The OpenVPN configuration file content"
+    required: true
+  openvpn_username:
+    description: "The OpenVPN username"
+    required: true
+  openvpn_password:
+    description: "The OpenVPN password"
+    required: true
+  nomad_address:
+    description: "The address of the Nomad server"
+    required: true
+  job_file_path:
+    description: "Path to the Nomad job file"
+    required: true
+    default: "job.nomad"
+  tag:
+    description: "The Docker image tag to deploy"
+    required: true
+    default: "${{ github.sha }}"
+runs:
+  using: "composite"
+  steps:
+    - name: Install OpenVPN
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y openvpn
+
+    - name: Setup `nomad`
+      uses: hashicorp/setup-nomad@main
+
+    - name: Configure OpenVPN
+      shell: bash
+      run: |
+        mkdir -p /home/runner/openvpn
+        echo "${{ inputs.openvpn_config }}" > /home/runner/openvpn/config.ovpn
+        echo -e "${{ inputs.openvpn_username }}\\n${{ inputs.openvpn_password }}" > /home/runner/openvpn/credentials
+        chmod 600 /home/runner/openvpn/credentials
+        sudo openvpn --config /home/runner/openvpn/config.ovpn --auth-user-pass /home/runner/openvpn/credentials --daemon
+        sleep 5  # Wait for the VPN connection to establish
+
+    - name: Update image tag
+      shell: bash
+      run: |
+        sed -i "s|ghcr.io/${{ github.repository }}:latest|ghcr.io/${{ github.repository }}:${{ inputs.tag }}|g" "${{ inputs.job_file_path }}"
+
+    - name: Deploy to Nomad
+      shell: bash
+      run: |
+        nomad job run ${{ inputs.job_file_path }}
+      env:
+        NOMAD_ADDR: ${{ inputs.nomad_address }}
