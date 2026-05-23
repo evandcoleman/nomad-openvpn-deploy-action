@@ -13,6 +13,10 @@ inputs:
   nomad_address:
     description: "The address of the Nomad server"
     required: true
+  nomad_token:
+    description: "Nomad ACL token (required when the cluster has ACLs enabled)"
+    required: false
+    default: ""
   job_file_path:
     description: "Path to the Nomad job file"
     required: true
@@ -54,3 +58,4 @@ runs:
         nomad job run ${{ inputs.job_file_path }}
       env:
         NOMAD_ADDR: ${{ inputs.nomad_address }}
+        NOMAD_TOKEN: ${{ inputs.nomad_token }}
